@@ -8,7 +8,18 @@ En önemli özellik: dosyaları **boyuta göre (en büyükten en küçüğe) sı
 
 ## 🤔 Önce şu soru: "APK verebilir misin?"
 
-**Hayır — ve bu bir eksiklik değil, imkânsızlık.** APK dosyaları **Android** içindir; iPhone (iOS) APK çalıştıramaz. iPhone uygulamaları **Xcode** ile derlenir ve senin Mac'in bunun için yeterli. Aşağıda hiç uygulama yapmamış biri için adım adım anlattım. Ücretsizdir (Apple'a para vermene gerek yok).
+**Hayır — ve bu bir eksiklik değil, imkânsızlık.** APK dosyaları **Android** içindir; iPhone (iOS) APK çalıştıramaz. iPhone uygulamaları Apple araçlarıyla derlenir. Ücretsizdir (Apple'a para vermene gerek yok).
+
+## 🧭 İki kurulum yolu
+
+Bu depoda **aynı uygulamanın iki sürümü** var; ikisinden birini seç:
+
+| Yol | Ne gerekir | Nereye kurulur | Kimin için |
+|-----|-----------|----------------|------------|
+| **A. Xcode** (`ClearPhotos.xcodeproj`) | Mac + Xcode (büyük indirme) | Doğrudan **iPhone'una** | En garantili yol |
+| **B. Swift Playgrounds** (`ClearPhotos.swiftpm`) | **iPad** (veya Mac) + Swift Playgrounds (küçük, ücretsiz) — **Xcode YOK** | iPad'de/Mac'te çalışır | Xcode kurmak istemeyenler |
+
+> **Önemli (Yol B):** Swift Playgrounds uygulamayı iPad/Mac üzerinde çalıştırır, doğrudan iPhone'a kurmaz. Ama **iCloud Fotoğraflar açıksa galerin tüm cihazlarda aynıdır** — iPad'de sildiğin fotoğraf/video iPhone'dan da silinir. Yani iCloud kullanıyorsan Yol B ile de iPhone'unu boşaltmış olursun. iCloud Fotoğraflar kapalıysa Yol B yalnızca o cihazın (iPad'in) galerisini temizler.
 
 ---
 
@@ -46,7 +57,7 @@ En önemli özellik: dosyaları **boyuta göre (en büyükten en küçüğe) sı
 
 ---
 
-## 🚀 Kurulum — Adım Adım (hiç uygulama yapmamış biri için)
+## 🚀 Yol A — Xcode ile kurulum (adım adım, hiç uygulama yapmamış biri için)
 
 ### 1) Projeyi Mac'e indir
 Bu depoyu Mac'ine indir:
@@ -98,6 +109,33 @@ Bu senin gibi "sadece kendim kullanacağım" biri için tamamen yeterli. **7 gü
 
 ---
 
+## 🟢 Yol B — Xcode olmadan: Swift Playgrounds
+
+Xcode kurmak istemiyorsan bu yol tam sana göre. **Swift Playgrounds** ücretsizdir ve Xcode'a göre çok daha küçüktür.
+
+### iPad ile (en pratik)
+1. iPad'e App Store'dan **Swift Playgrounds**'u kur (ücretsiz).
+2. Bu depodaki **`ClearPhotos.swiftpm`** klasörünü iPad'e aktar:
+   - En kolayı: Mac'ten iPad'e **AirDrop** ile gönder (klasörü seç, AirDrop), ya da
+   - iCloud Drive / Dosyalar uygulamasına koyup iPad'de aç.
+3. `ClearPhotos.swiftpm`'e dokun → **Swift Playgrounds** ile açılır.
+4. Sağ üstteki **▶ (Çalıştır / Run)** ile başlat. Fotoğraf izni ister → **Tam Erişim** ver.
+5. Kaydırarak temizle. **iCloud Fotoğraflar açıksa** sildiklerin iPhone'undan da gider.
+
+> Aktarırken klasör tek dosya gibi görünmezse: `ClearPhotos.swiftpm` klasörünü **zip'leyip** gönder, iPad'de Dosyalar'da açınca Swift Playgrounds tanır. (İstersen bunu senin için hazır zip olarak da verebilirim.)
+
+### Mac ile
+1. Mac App Store'dan **Swift Playgrounds**'u kur (Xcode'a göre çok küçük).
+2. `ClearPhotos.swiftpm`'i Swift Playgrounds ile aç, **▶ Run**.
+3. Uygulama Mac'te çalışır ve Mac'in Fotoğraflar kitaplığına erişir. **iCloud Fotoğraflar açıksa** yaptığın silmeler iPhone'a da yansır.
+
+### Yol B'nin sınırları (dürüstçe)
+- Uygulama **iPhone'un üstünde** çalışmaz; iPad/Mac'te çalışır. iPhone'u ancak **iCloud Fotoğraflar** üzerinden dolaylı temizler.
+- iCloud Fotoğraflar kapalıysa yalnızca çalıştırdığın cihazın galerisi etkilenir.
+- Uygulama simgesini Swift Playgrounds içinden (proje ayarları) sonradan ekleyebilirsin.
+
+---
+
 ## 📱 Nasıl kullanılır
 
 1. **Kaynak** seç (ör. *Videolar* ya da *Tüm Fotoğraflar* ya da bir albüm).
@@ -135,7 +173,8 @@ Bu senin gibi "sadece kendim kullanacağım" biri için tamamen yeterli. **7 gü
 ## 🗂️ Proje yapısı
 
 ```
-ClearPhotos.xcodeproj      → Xcode projesi (çift tıkla)
+ClearPhotos.xcodeproj      → Yol A: Xcode projesi (çift tıkla)
+ClearPhotos.swiftpm/       → Yol B: Swift Playgrounds sürümü (Xcode gerekmez)
 ClearPhotos/
   ClearPhotosApp.swift     → Uygulama girişi
   ContentView.swift        → İzin ekranları + yönlendirme
