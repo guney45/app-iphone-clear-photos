@@ -8,13 +8,16 @@ struct HomeView: View {
     @State private var selectedSourceID: String = "all"
     @State private var sort: SortOption = .sizeDescending
     @State private var filter: MediaKindFilter = .all
+    @State private var reviewMode: ReviewMode = .cards
 
     @State private var isBuilding = false
     @State private var buildDone = 0
     @State private var buildTotal = 0
 
     @State private var deck: SwipeDeckViewModel?
-    @State private var goToDeck = false
+    @State private var gridEntries: [AssetEntry]?
+    @State private var navMode: ReviewMode = .cards
+    @State private var goToReview = false
     @State private var emptyMessage: String?
 
     @State private var activeSheet: ActiveSheet?
@@ -49,6 +52,7 @@ struct HomeView: View {
                         sourceSection
                         sortSection
                         filterSection
+                        modeSection
                         skipToggle
                         Color.clear.frame(height: 90)
                     }
@@ -75,9 +79,12 @@ struct HomeView: View {
                     }
                 }
             }
-            .navigationDestination(isPresented: $goToDeck) {
-                if let deck {
-                    SwipeDeckView(vm: deck)
+            .navigationDestination(isPresented: $goToReview) {
+                switch navMode {
+                case .cards:
+                    if let deck { SwipeDeckView(vm: deck) }
+                case .grid:
+                    if let gridEntries { GridReviewView(entries: gridEntries) }
                 }
             }
             .sheet(item: $activeSheet) { sheet in
@@ -272,6 +279,28 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Görünüm (kart / ızgara)
+
+    private var modeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("Görünüm", subtitle: "Nasıl inceleyeyim?")
+            HStack(spacing: 10) {
+                ForEach(ReviewMode.allCases) { mode in
+                    chip(title: mode.title,
+                         systemImage: mode.systemImage,
+                         isSelected: mode == reviewMode) {
+                        reviewMode = mode
+                    }
+                }
+            }
+            if reviewMode == .grid {
+                Text("Izgara: küçük fotoğrafları hızlıca göz gezdir, dokunup çoklu seç, basılı tutunca büyür. Başkalarına ait fotoğrafları elle ayıklamak için ideal.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     // MARK: - Zaten incelenenler
 
     private var skipToggle: some View {
@@ -403,7 +432,13 @@ struct HomeView: View {
             return
         }
 
-        deck = SwipeDeckViewModel(entries: entries, service: service, store: store)
-        goToDeck = true
+        navMode = reviewMode
+        switch reviewMode {
+        case .cards:
+            deck = SwipeDeckViewModel(entries: entries, service: service, store: store)
+        case .grid:
+            gridEntries = entries
+        }
+        goToReview = true
     }
 }

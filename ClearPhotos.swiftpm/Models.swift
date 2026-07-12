@@ -37,6 +37,28 @@ enum SortOption: String, CaseIterable, Identifiable {
     }
 }
 
+/// İnceleme görünümü: tek tek büyük kart mı, yoksa küçük ızgara mı?
+enum ReviewMode: String, CaseIterable, Identifiable {
+    case cards
+    case grid
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .cards: return "Kart"
+        case .grid:  return "Izgara"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .cards: return "rectangle.portrait"
+        case .grid:  return "square.grid.2x2"
+        }
+    }
+}
+
 /// Fotoğraf / video filtresi.
 enum MediaKindFilter: String, CaseIterable, Identifiable {
     case all
