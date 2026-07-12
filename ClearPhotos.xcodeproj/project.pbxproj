@@ -19,6 +19,7 @@
 		CC0000000000000000000010 /* CardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000010 /* CardView.swift */; };
 		CC0000000000000000000011 /* SwipeDeckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000011 /* SwipeDeckView.swift */; };
 		CC0000000000000000000012 /* TrashReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000012 /* TrashReviewView.swift */; };
+		CC0000000000000000000013 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000013 /* SettingsView.swift */; };
 		AA0000000000000000000011 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000010 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -37,6 +38,7 @@
 		BB0000000000000000000010 /* CardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardView.swift; sourceTree = "<group>"; };
 		BB0000000000000000000011 /* SwipeDeckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeDeckView.swift; sourceTree = "<group>"; };
 		BB0000000000000000000012 /* TrashReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrashReviewView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000013 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -75,6 +77,7 @@
 				BB0000000000000000000010 /* CardView.swift */,
 				BB0000000000000000000011 /* SwipeDeckView.swift */,
 				BB0000000000000000000012 /* TrashReviewView.swift */,
+				BB0000000000000000000013 /* SettingsView.swift */,
 				BB0000000000000000000007 /* SwipeDeckViewModel.swift */,
 				BB0000000000000000000004 /* PhotoLibraryService.swift */,
 				BB0000000000000000000005 /* ReviewStore.swift */,
@@ -167,6 +170,7 @@
 				CC0000000000000000000010 /* CardView.swift in Sources */,
 				CC0000000000000000000011 /* SwipeDeckView.swift in Sources */,
 				CC0000000000000000000012 /* TrashReviewView.swift in Sources */,
+				CC0000000000000000000013 /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

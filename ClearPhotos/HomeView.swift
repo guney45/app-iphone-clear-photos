@@ -17,6 +17,16 @@ struct HomeView: View {
     @State private var goToDeck = false
     @State private var emptyMessage: String?
 
+    @State private var activeSheet: ActiveSheet?
+
+    @State private var busyDays: [DaySummary] = []
+    @State private var busyLoading = false
+
+    private enum ActiveSheet: Int, Identifiable, Equatable {
+        case settings, trash
+        var id: Int { rawValue }
+    }
+
     private var selectedSource: MediaSource? {
         service.sources.first { $0.id == selectedSourceID }
     }
@@ -29,14 +39,18 @@ struct HomeView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 26) {
                         statsHeader
+                        if store.pendingCount > 0 {
+                            pendingCard
+                        }
                         if service.authorizationStatus == .limited {
                             limitedBanner
                         }
+                        busyDaysSection
                         sourceSection
                         sortSection
                         filterSection
                         skipToggle
-                        Color.clear.frame(height: 90) // başlat butonu için boşluk
+                        Color.clear.frame(height: 90)
                     }
                     .padding(20)
                 }
@@ -52,11 +66,29 @@ struct HomeView: View {
             }
             .navigationTitle("ClearPhotos")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        activeSheet = .settings
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                }
+            }
             .navigationDestination(isPresented: $goToDeck) {
                 if let deck {
                     SwipeDeckView(vm: deck)
                 }
             }
+            .sheet(item: $activeSheet) { sheet in
+                switch sheet {
+                case .settings: SettingsView()
+                case .trash: TrashReviewView()
+                }
+            }
+            .task { await loadBusyDays() }
+            .onChange(of: store.busyDayThreshold) { _ in Task { await loadBusyDays() } }
+            .onChange(of: activeSheet) { newValue in if newValue == nil { Task { await loadBusyDays() } } }
             .alert("Kart bulunamadı", isPresented: Binding(
                 get: { emptyMessage != nil },
                 set: { if !$0 { emptyMessage = nil } })) {
@@ -89,6 +121,34 @@ struct HomeView: View {
         .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 20))
     }
 
+    // MARK: - Bekleyen silme kartı
+
+    private var pendingCard: some View {
+        Button {
+            activeSheet = .trash
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "trash.circle.fill")
+                    .font(.system(size: 34))
+                    .foregroundStyle(Theme.delete)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(store.pendingCount) öğe silinmeyi bekliyor")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    Text("\(formattedBytes(store.pendingTotalBytes)) açabilirsin · dokun ve sil")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(.white.opacity(0.7))
+            }
+            .padding(16)
+            .background(Theme.delete.opacity(0.18), in: RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.delete.opacity(0.4), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
     private var limitedBanner: some View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -99,6 +159,55 @@ struct HomeView: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.skip.opacity(0.15), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    // MARK: - Yoğun günler
+
+    private var busyDaysSection: some View {
+        Group {
+            if busyLoading {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small).tint(.white)
+                    Text("Yoğun günler taranıyor…").font(.caption).foregroundStyle(.secondary)
+                }
+            } else if !busyDays.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    sectionTitle("Yoğun günler", subtitle: "Çok fotoğraf çektiğin günler — dokunup sadece o günü incele")
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(busyDays.prefix(20)) { day in
+                                busyDayCard(day)
+                            }
+                        }
+                        .padding(.horizontal, 2)
+                    }
+                }
+            }
+        }
+    }
+
+    private func busyDayCard(_ day: DaySummary) -> some View {
+        Button {
+            startDaySession(day)
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                Image(systemName: "calendar")
+                    .font(.headline)
+                    .foregroundStyle(Theme.accent)
+                Text(day.title)
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Text("\(day.count) öğe")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+            .frame(width: 130, alignment: .leading)
+            .padding(14)
+            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Kaynak seçimi
@@ -184,7 +293,7 @@ struct HomeView: View {
 
     private var startButton: some View {
         Button {
-            Task { await startSession() }
+            Task { await startSession(source: selectedSource) }
         } label: {
             HStack {
                 Image(systemName: "play.fill")
@@ -250,10 +359,26 @@ struct HomeView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Oturumu başlat
+    // MARK: - Oturumlar
 
-    private func startSession() async {
-        guard let source = selectedSource else { return }
+    private func loadBusyDays() async {
+        guard service.hasAccess else { return }
+        busyLoading = true
+        busyDays = await service.busyDays(threshold: store.busyDayThreshold)
+        busyLoading = false
+    }
+
+    private func startDaySession(_ day: DaySummary) {
+        let daySource = MediaSource(id: "day-\(day.id)",
+                                    title: day.title,
+                                    systemImage: "calendar",
+                                    collection: nil,
+                                    dateInterval: day.interval)
+        Task { await startSession(source: daySource) }
+    }
+
+    private func startSession(source: MediaSource?) async {
+        guard let source else { return }
         isBuilding = true
         buildDone = 0
         buildTotal = 0
@@ -263,6 +388,8 @@ struct HomeView: View {
             buildTotal = total
         }
 
+        // Silme listesindekileri her zaman atla (zaten karar verildi, ana ekrandan erişilir).
+        entries = entries.filter { !store.isPending($0.id) }
         if store.skipReviewed {
             entries = entries.filter { !store.isReviewed($0.id) }
         }

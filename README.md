@@ -32,12 +32,14 @@ Bu depoda **aynı uygulamanın iki sürümü** var; ikisinden birini seç:
 - 🔒 %100 cihazda çalışır. Hiçbir fotoğraf/video/bilgi dışarı gönderilmez (kodda ağ isteği yoktur).
 
 **Senin de düşünmediğin, eklediğim özellikler**
-- 🗑️ **Toplu silme + önizleme:** Sola kaydırdıkların hemen silinmez; bir "Sil listesi"nde birikir. Silmeden önce **kaç öğe / kaç GB** kazanacağını görürsün, sonra tek dokunuşla hepsini silersin. (Kazara silmeyi önler.)
+- 🗑️ **Kalıcı sil listesi + toplu silme:** Sola kaydırdıkların hemen silinmez; bir "Sil listesi"nde birikir. Bu liste artık **kalıcıdır** — uygulamayı kapatsan, ana ekrana dönsen bile kaybolmaz. Ana ekranda **"X öğe silinmeyi bekliyor"** kartından her an girip **kaç GB** kazanacağını görür, tek dokunuşla hepsini silersin. (Silmediğin sürece "sil" etiketi kalıcı olarak durur; sadece sen onaylayınca gerçekten silinir.)
+- 📅 **Yoğun gün önerisi:** Özel günlerde/etkinliklerde çok fotoğraf çekilir, çoğu da gereksizdir. Uygulama, bir günde eşiği (varsayılan **100**) aşan öğe varsa o günü ana ekranda **önerir** — "23 Haziran 2018 · 1000 öğe" gibi. Dokununca **sadece o günün** foto/videolarını incelersin. Eşiği **Ayarlar**'dan değiştirebilirsin.
+- ⚙️ **Ayarlar ekranı:** Yoğun gün eşiği, "incelenenleri atla", sil listesini boşaltma, incelemeyi/istatistiği sıfırlama.
 - ↩️ **Geri Al (Undo):** Yanlış kaydırdıysan bir önceki karta dön.
 - ⏭️ **Atla (yukarı kaydır):** Kararsızsan öğeyi bırak, sonra tekrar gelsin.
 - 🧠 **İncelenenleri hatırlama:** Karar verdiğin öğeler bir daha karşına çıkmaz (kapatılabilir). Böylece binlerce fotoğrafı birkaç oturumda bitirirsin.
 - 📊 **Kazanç sayacı:** "Şimdiye kadar X GB yer açtın" — motive eder.
-- ▶️ **Videolar otomatik, sessiz ve döngüsel oynar** (dokununca sesi açarsın); kaydırma bu sırada sorunsuz çalışır.
+- ▶️ **Video oynatıcı:** Videolar sessiz ve döngüsel oynar; **ilerleme çubuğunu sürükleyip** videonun ilerisine bakabilir, oynat/duraklat ve sesi açıp kapatabilirsin. Kontroller kartın dışındadır, böylece kaydırma sorunsuz çalışır.
 - 🎞️ Her kartta **boyut**, tür, çözünürlük, tarih ve video süresi görünür.
 - 📳 Kararlarda hafif **titreşim (haptik)** geri bildirimi.
 - 🌙 Şık koyu tema.
@@ -147,8 +149,12 @@ Xcode kurmak istemiyorsan bu yol tam sana göre. **Swift Playgrounds** ücretsiz
    - 👈 **Sola kaydır** = Sil listesine ekle
    - 👆 **Yukarı kaydır** = Atla (sonra tekrar gelsin)
    - Alttaki butonlarla da aynısını yapabilir, **Geri Al**'a basabilirsin.
-6. Sağ üstteki **🗑️ rozetine** dokun → sil listesini gör, kazanacağın yeri kontrol et, **hepsini sil**.
+6. Sağ üstteki **🗑️ rozetine** (ya da ana ekrandaki **"silinmeyi bekliyor"** kartına) dokun → sil listesini gör, kazanacağın yeri kontrol et, **hepsini sil**.
 7. Silinenler **Fotoğraflar → Albümler → Son Silinenler**'e gider; oradan hemen kalıcı silersen yer anında boşalır.
+
+**Yoğun günler:** Ana ekranda, çok fotoğraf çektiğin günler önerilir (ör. "23 Haziran 2018 · 1000 öğe"). Dokununca sadece o günü incelersin. Kaç öğeden itibaren önerileceğini **⚙️ Ayarlar → Yoğun gün eşiği**'nden ayarla.
+
+**Sil listesi kalıcı:** Sola kaydırıp "sil" dediklerin, sen onaylayana kadar **kaybolmaz** (uygulamayı kapatsan bile). Ana ekrandaki kırmızı karttan her an ulaşırsın. Fikrin değişirse Ayarlar'dan listeyi (silmeden) boşaltabilirsin.
 
 ---
 
@@ -181,7 +187,8 @@ ClearPhotos/
   HomeView.swift           → Ana ekran: kaynak/sıralama/filtre + istatistik
   SwipeDeckView.swift      → Kart destesi, kaydırma, butonlar
   CardView.swift           → Tek foto/video kartı
-  TrashReviewView.swift    → Sil listesi + toplu silme
+  TrashReviewView.swift    → Kalıcı sil listesi + toplu silme
+  SettingsView.swift       → Ayarlar (yoğun gün eşiği, sıfırlamalar)
   SwipeDeckViewModel.swift → Oturum mantığı (sakla/sil/atla/geri al)
   PhotoLibraryService.swift→ PhotoKit: izin, boyut hesabı, sıralama, silme
   ReviewStore.swift        → İstatistik ve "incelendi" kaydı (cihazda)

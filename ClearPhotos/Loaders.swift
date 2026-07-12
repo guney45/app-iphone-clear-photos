@@ -54,12 +54,23 @@ final class VideoLoader: ObservableObject {
     @Published var isMuted: Bool = true {
         didSet { player?.isMuted = isMuted }
     }
+    @Published var isPlaying: Bool = true
+    @Published var currentTime: Double = 0
+    @Published var duration: Double = 0
+    /// Kullanıcı ilerleme çubuğunu sürüklerken otomatik güncellemeyi durdurmak için.
+    var isScrubbing = false
 
     private var endObserver: NSObjectProtocol?
+    private var timeObserver: Any?
     private var requestID: PHImageRequestID?
+    private var loadedAssetID: String?
 
     func load(asset: PHAsset) {
-        guard player == nil else { return }
+        // Aynı video zaten yüklüyse tekrar yükleme.
+        if loadedAssetID == asset.localIdentifier, player != nil { return }
+        teardown()
+        loadedAssetID = asset.localIdentifier
+
         let options = PHVideoRequestOptions()
         options.deliveryMode = .automatic
         options.isNetworkAccessAllowed = true
@@ -67,11 +78,13 @@ final class VideoLoader: ObservableObject {
         requestID = PHImageManager.default().requestPlayerItem(forVideo: asset, options: options) { [weak self] item, _ in
             guard let item else { return }
             Task { @MainActor in
-                guard let self else { return }
+                guard let self, self.loadedAssetID == asset.localIdentifier else { return }
                 let player = AVPlayer(playerItem: item)
                 player.isMuted = self.isMuted
                 self.player = player
+                self.isPlaying = true
                 player.play()
+
                 self.endObserver = NotificationCenter.default.addObserver(
                     forName: .AVPlayerItemDidPlayToEndTime,
                     object: item,
@@ -79,13 +92,47 @@ final class VideoLoader: ObservableObject {
                         player.seek(to: .zero)
                         player.play()
                 }
+
+                let interval = CMTime(seconds: 0.2, preferredTimescale: 600)
+                self.timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+                    guard let self, !self.isScrubbing else { return }
+                    self.currentTime = time.seconds
+                    if let dur = player.currentItem?.duration.seconds, dur.isFinite, dur > 0 {
+                        self.duration = dur
+                    }
+                }
             }
         }
     }
 
+    func togglePlayPause() {
+        guard let player else { return }
+        if isPlaying {
+            player.pause()
+        } else {
+            player.play()
+        }
+        isPlaying.toggle()
+    }
+
+    /// İlerleme çubuğundan belirli bir saniyeye atla.
+    func seek(to seconds: Double) {
+        currentTime = seconds
+        player?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600),
+                     toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
     func teardown() {
         player?.pause()
+        if let timeObserver {
+            player?.removeTimeObserver(timeObserver)
+            self.timeObserver = nil
+        }
         player = nil
+        loadedAssetID = nil
+        currentTime = 0
+        duration = 0
+        isPlaying = true
         if let endObserver {
             NotificationCenter.default.removeObserver(endObserver)
             self.endObserver = nil

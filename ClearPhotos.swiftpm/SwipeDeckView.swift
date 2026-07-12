@@ -4,7 +4,10 @@ import UIKit
 /// Kart destesi: sağa/sola/yukarı kaydırarak karar verdiğin ana ekran.
 struct SwipeDeckView: View {
     @ObservedObject var vm: SwipeDeckViewModel
+    @EnvironmentObject private var store: ReviewStore
     @Environment(\.dismiss) private var dismiss
+
+    @StateObject private var videoLoader = VideoLoader()
 
     @State private var drag: CGSize = .zero
     @State private var showTrash = false
@@ -13,6 +16,8 @@ struct SwipeDeckView: View {
     private let vThreshold: CGFloat = 130
 
     private enum Swipe { case keep, delete, skip }
+
+    private var currentIsVideo: Bool { vm.current?.isVideo == true }
 
     var body: some View {
         ZStack {
@@ -23,6 +28,9 @@ struct SwipeDeckView: View {
             } else {
                 VStack(spacing: 0) {
                     deck
+                    if currentIsVideo {
+                        videoControls
+                    }
                     actionButtons
                 }
             }
@@ -31,13 +39,13 @@ struct SwipeDeckView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                if vm.pendingCount > 0 {
+                if store.pendingCount > 0 {
                     Button {
                         showTrash = true
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "trash.fill")
-                            Text("\(vm.pendingCount)")
+                            Text("\(store.pendingCount)")
                         }
                         .font(.subheadline.bold())
                         .foregroundStyle(Theme.delete)
@@ -46,7 +54,18 @@ struct SwipeDeckView: View {
             }
         }
         .sheet(isPresented: $showTrash) {
-            TrashReviewView(vm: vm)
+            TrashReviewView()
+        }
+        .onAppear(perform: syncVideo)
+        .onChange(of: vm.current?.id) { _ in syncVideo() }
+        .onDisappear { videoLoader.teardown() }
+    }
+
+    private func syncVideo() {
+        if let current = vm.current, current.isVideo {
+            videoLoader.load(asset: current.asset)
+        } else {
+            videoLoader.teardown()
         }
     }
 
@@ -63,7 +82,7 @@ struct SwipeDeckView: View {
             }
 
             if let current = vm.current {
-                CardView(entry: current, isTop: true)
+                CardView(entry: current, isTop: true, player: currentIsVideo ? videoLoader.player : nil)
                     .id(current.id)
                     .offset(drag)
                     .rotationEffect(.degrees(Double(drag.width / 18)))
@@ -104,6 +123,46 @@ struct SwipeDeckView: View {
             .padding(.vertical, 6)
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(color, lineWidth: 4))
             .rotationEffect(.degrees(-14))
+    }
+
+    // MARK: - Video kontrolleri (kart dışında; kaydırmayla çakışmaz)
+
+    private var videoControls: some View {
+        VStack(spacing: 6) {
+            Slider(
+                value: Binding(
+                    get: { min(videoLoader.currentTime, max(videoLoader.duration, 0.1)) },
+                    set: { videoLoader.seek(to: $0) }
+                ),
+                in: 0...max(videoLoader.duration, 1),
+                onEditingChanged: { editing in
+                    videoLoader.isScrubbing = editing
+                }
+            )
+            .tint(Theme.accent)
+
+            HStack(spacing: 16) {
+                Button {
+                    videoLoader.togglePlayPause()
+                } label: {
+                    Image(systemName: videoLoader.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.title3)
+                }
+                Text("\(formattedDuration(videoLoader.currentTime)) / \(formattedDuration(videoLoader.duration))")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    videoLoader.isMuted.toggle()
+                } label: {
+                    Image(systemName: videoLoader.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                        .font(.title3)
+                }
+            }
+            .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 4)
     }
 
     // MARK: - Butonlar
@@ -158,8 +217,8 @@ struct SwipeDeckView: View {
             Text("Bu yığını bitirdin 🎉")
                 .font(.title2.bold())
 
-            if vm.pendingCount > 0 {
-                Text("\(vm.pendingCount) öğe silinmek üzere işaretli\n\(formattedBytes(vm.pendingBytes)) yer açabilirsin")
+            if store.pendingCount > 0 {
+                Text("\(store.pendingCount) öğe silinmek üzere işaretli\n\(formattedBytes(store.pendingTotalBytes)) yer açabilirsin")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
 

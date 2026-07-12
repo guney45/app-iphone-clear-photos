@@ -2,27 +2,35 @@ import SwiftUI
 import UIKit
 import Photos
 
-/// Silinmek üzere işaretlenen öğelerin listesi. Buradan tek tek çıkarabilir
-/// ya da hepsini birden silebilirsin. Silme sırasında iOS kendi onayını gösterir.
+/// Kalıcı silme listesi. Ana ekrandan da, inceleme sırasında da açılabilir.
+/// Buradan tek tek çıkarabilir ya da hepsini birden silebilirsin.
+/// Silme sırasında iOS kendi onayını gösterir.
 struct TrashReviewView: View {
-    @ObservedObject var vm: SwipeDeckViewModel
+    @EnvironmentObject private var service: PhotoLibraryService
+    @EnvironmentObject private var store: ReviewStore
     @Environment(\.dismiss) private var dismiss
 
+    @State private var entries: [AssetEntry] = []
+    @State private var isDeleting = false
+    @State private var errorText: String?
+
     private let columns = [GridItem(.adaptive(minimum: 100), spacing: 8)]
+
+    private var totalBytes: Int64 { entries.reduce(0) { $0 + $1.byteSize } }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Theme.backgroundGradient.ignoresSafeArea()
 
-                if vm.pendingCount == 0 {
+                if entries.isEmpty {
                     emptyState
                 } else {
                     VStack(spacing: 0) {
                         header
                         ScrollView {
                             LazyVGrid(columns: columns, spacing: 8) {
-                                ForEach(vm.pendingDelete) { entry in
+                                ForEach(entries) { entry in
                                     cell(entry)
                                 }
                             }
@@ -43,22 +51,27 @@ struct TrashReviewView: View {
                     Button("Kapat") { dismiss() }
                 }
             }
+            .onAppear(perform: reload)
             .alert("Bir sorun oldu", isPresented: Binding(
-                get: { vm.deleteError != nil },
-                set: { if !$0 { vm.deleteError = nil } })) {
+                get: { errorText != nil },
+                set: { if !$0 { errorText = nil } })) {
                 Button("Tamam", role: .cancel) {}
             } message: {
-                Text(vm.deleteError ?? "")
+                Text(errorText ?? "")
             }
         }
     }
 
+    private func reload() {
+        entries = service.pendingEntries(store: store)
+    }
+
     private var header: some View {
         VStack(spacing: 4) {
-            Text(formattedBytes(vm.pendingBytes))
+            Text(formattedBytes(totalBytes))
                 .font(.system(size: 34, weight: .bold, design: .rounded))
                 .foregroundStyle(Theme.delete)
-            Text("\(vm.pendingCount) öğe silmeye hazır")
+            Text("\(entries.count) öğe silmeye hazır")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -91,7 +104,8 @@ struct TrashReviewView: View {
                 }
 
             Button {
-                withAnimation { vm.removeFromPile(entry) }
+                store.removePending(id: entry.id)
+                withAnimation { reload() }
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title3)
@@ -104,20 +118,15 @@ struct TrashReviewView: View {
 
     private var deleteButton: some View {
         Button {
-            Task {
-                await vm.commitDeletions()
-                if vm.deleteError == nil && vm.pendingCount == 0 {
-                    dismiss()
-                }
-            }
+            Task { await commit() }
         } label: {
             HStack {
-                if vm.isDeleting {
+                if isDeleting {
                     ProgressView().tint(.white)
                 } else {
                     Image(systemName: "trash.fill")
                 }
-                Text(vm.isDeleting ? "Siliniyor…" : "\(vm.pendingCount) Öğeyi Sil  ·  \(formattedBytes(vm.pendingBytes))")
+                Text(isDeleting ? "Siliniyor…" : "\(entries.count) Öğeyi Sil  ·  \(formattedBytes(totalBytes))")
             }
             .font(.headline)
             .frame(maxWidth: .infinity)
@@ -125,9 +134,29 @@ struct TrashReviewView: View {
             .background(Theme.delete, in: RoundedRectangle(cornerRadius: 16))
             .foregroundStyle(.white)
         }
-        .disabled(vm.isDeleting)
+        .disabled(isDeleting)
         .padding(.horizontal, 20)
         .padding(.bottom, 20)
+    }
+
+    private func commit() async {
+        guard !entries.isEmpty else { return }
+        isDeleting = true
+        errorText = nil
+        let assets = entries.map { $0.asset }
+        let ids = entries.map { $0.id }
+        let bytes = totalBytes
+        do {
+            try await service.deleteAssets(assets)
+            store.recordDeletion(ids: ids, bytes: bytes)
+            service.invalidateDayCache()
+            reload()
+            isDeleting = false
+            dismiss()
+        } catch {
+            errorText = "Silme tamamlanmadı ya da iptal edildi."
+            isDeleting = false
+        }
     }
 
     private var emptyState: some View {

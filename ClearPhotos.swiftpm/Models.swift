@@ -91,4 +91,29 @@ struct MediaSource: Identifiable {
     let systemImage: String
     /// `nil` ise tüm fotoğraf kütüphanesi kullanılır.
     let collection: PHAssetCollection?
+    /// Doluysa yalnızca bu tarih aralığındaki öğeler getirilir (ör. tek bir gün).
+    var dateInterval: DateInterval? = nil
+}
+
+/// Belirli bir günde çekilen/kaydedilen öğe sayısı (yoğun gün önerisi için).
+struct DaySummary: Identifiable {
+    let dayStart: Date
+    let count: Int
+
+    var id: Double { dayStart.timeIntervalSince1970 }
+
+    var dayEnd: Date {
+        Calendar.current.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
+    }
+
+    var interval: DateInterval {
+        DateInterval(start: dayStart, end: dayEnd)
+    }
+
+    var title: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "tr_TR")
+        formatter.dateFormat = "d MMMM yyyy"
+        return formatter.string(from: dayStart)
+    }
 }

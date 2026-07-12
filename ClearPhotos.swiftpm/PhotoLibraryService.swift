@@ -127,8 +127,16 @@ final class PhotoLibraryService: ObservableObject {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async { [self] in
                 let options = PHFetchOptions()
+                var predicates: [NSPredicate] = []
                 if let mediaType = filter.mediaType {
-                    options.predicate = NSPredicate(format: "mediaType == %d", mediaType.rawValue)
+                    predicates.append(NSPredicate(format: "mediaType == %d", mediaType.rawValue))
+                }
+                if let interval = source.dateInterval {
+                    predicates.append(NSPredicate(format: "creationDate >= %@ AND creationDate < %@",
+                                                  interval.start as NSDate, interval.end as NSDate))
+                }
+                if !predicates.isEmpty {
+                    options.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
                 }
                 switch sort {
                 case .dateNewest:
@@ -178,6 +186,62 @@ final class PhotoLibraryService: ObservableObject {
                     continuation.resume(returning: entries)
                 }
             }
+        }
+    }
+
+    // MARK: - Yoğun günler
+
+    private var dayCountsCache: [DaySummary]?
+
+    /// Kütüphanedeki tüm öğeleri güne göre gruplar ve gün başına sayıyı döndürür (önbellekli).
+    func allDaySummaries() async -> [DaySummary] {
+        if let cached = dayCountsCache { return cached }
+        let result: [DaySummary] = await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let options = PHFetchOptions()
+                options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+                let fetch = PHAsset.fetchAssets(with: options)
+                var counts: [Date: Int] = [:]
+                let calendar = Calendar.current
+                fetch.enumerateObjects { asset, _, _ in
+                    let date = asset.creationDate ?? Date.distantPast
+                    let day = calendar.startOfDay(for: date)
+                    counts[day, default: 0] += 1
+                }
+                let summaries = counts.map { DaySummary(dayStart: $0.key, count: $0.value) }
+                continuation.resume(returning: summaries)
+            }
+        }
+        dayCountsCache = result
+        return result
+    }
+
+    /// Eşiği geçen günleri, en çok öğeden en aza sıralı döndürür.
+    func busyDays(threshold: Int) async -> [DaySummary] {
+        let all = await allDaySummaries()
+        return all
+            .filter { $0.count >= threshold }
+            .sorted { $0.count > $1.count }
+    }
+
+    /// Kütüphane değiştiğinde yoğun gün önbelleğini temizle.
+    func invalidateDayCache() { dayCountsCache = nil }
+
+    // MARK: - Silme listesini gerçek öğelere çevir
+
+    /// Kalıcı silme listesindeki kimlikleri gerçek öğelere dönüştürür.
+    /// Artık var olmayan kimlikleri store'dan temizler.
+    func pendingEntries(store: ReviewStore) -> [AssetEntry] {
+        let ids = store.pendingDeleteIDs
+        guard !ids.isEmpty else { return [] }
+        let fetch = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
+        var byID: [String: PHAsset] = [:]
+        fetch.enumerateObjects { asset, _, _ in byID[asset.localIdentifier] = asset }
+        store.prunePending(keepingOnly: Set(byID.keys))
+        return ids.compactMap { id in
+            guard let asset = byID[id] else { return nil }
+            let size = store.pendingBytes(for: id) ?? computeSize(for: asset)
+            return AssetEntry(asset: asset, byteSize: size)
         }
     }
 

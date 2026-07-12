@@ -1,15 +1,19 @@
 import SwiftUI
 import UIKit
 import Photos
+import AVFoundation
 
 /// Tek bir fotoğraf/video kartı: görsel/video + boyut ve bilgiler.
+/// Video oynatıcı (varsa) dışarıdan verilir; kontroller kart dışındadır,
+/// böylece kaydırma hareketiyle çakışmaz.
 struct CardView: View {
     let entry: AssetEntry
     let isTop: Bool
+    /// Yalnızca üstteki video kart için dolu olur.
+    var player: AVPlayer? = nil
 
     @EnvironmentObject private var service: PhotoLibraryService
     @StateObject private var imageLoader = AssetImageLoader()
-    @StateObject private var videoLoader = VideoLoader()
 
     private var isVideo: Bool { entry.isVideo }
     private var sizeToShow: Int64 { max(entry.byteSize, imageLoader.displaySize) }
@@ -19,7 +23,6 @@ struct CardView: View {
             ZStack {
                 Color.black
 
-                // Önizleme görseli (video için de poster görevi görür)
                 if let image = imageLoader.image {
                     Image(uiImage: image)
                         .resizable()
@@ -27,23 +30,15 @@ struct CardView: View {
                         .frame(width: geo.size.width, height: geo.size.height)
                 }
 
-                // Üstteki kartsa ve videoysa oynatıcıyı görselin üzerine koy
-                if isVideo, isTop, let player = videoLoader.player {
+                if let player {
                     PlayerLayerView(player: player)
                 }
 
-                if imageLoader.image == nil && videoLoader.player == nil {
+                if imageLoader.image == nil && player == nil {
                     ProgressView().tint(.white)
                 }
 
-                // Bilgi çubuğu
                 VStack {
-                    HStack {
-                        Spacer()
-                        if isVideo {
-                            controlBadges
-                        }
-                    }
                     Spacer()
                     infoBar
                 }
@@ -60,23 +55,12 @@ struct CardView: View {
                                  targetSize: CGSize(width: geo.size.width * 2, height: geo.size.height * 2),
                                  knownSize: entry.byteSize,
                                  service: service)
-                if isVideo, isTop {
-                    videoLoader.load(asset: entry.asset)
-                }
-            }
-            .onChange(of: isTop) { nowTop in
-                if nowTop, isVideo {
-                    videoLoader.load(asset: entry.asset)
-                }
             }
             .onDisappear {
                 imageLoader.cancel()
-                videoLoader.teardown()
             }
         }
     }
-
-    // MARK: - Bilgi çubuğu
 
     private var infoBar: some View {
         HStack(alignment: .bottom) {
@@ -98,19 +82,6 @@ struct CardView: View {
             LinearGradient(colors: [.black.opacity(0.0), .black.opacity(0.75)],
                           startPoint: .top, endPoint: .bottom)
         )
-    }
-
-    private var controlBadges: some View {
-        Button {
-            videoLoader.isMuted.toggle()
-        } label: {
-            Image(systemName: videoLoader.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                .font(.subheadline)
-                .padding(10)
-                .background(.black.opacity(0.5), in: Circle())
-                .foregroundStyle(.white)
-        }
-        .padding(14)
     }
 
     private var subtitle: String {

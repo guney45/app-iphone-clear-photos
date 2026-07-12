@@ -1,19 +1,15 @@
 import Foundation
 import Photos
 
-/// Bir inceleme oturumunun mantığı: hangi karttayız, silinmek üzere işaretlenenler,
-/// geri alma geçmişi ve silmeyi onaylama.
+/// Bir inceleme oturumunun mantığı: hangi karttayız, geri alma geçmişi.
+/// SİL kararları kalıcı silme listesine (ReviewStore) yazılır.
 @MainActor
 final class SwipeDeckViewModel: ObservableObject {
     @Published private(set) var entries: [AssetEntry]
     @Published private(set) var index: Int = 0
-    /// Silinmek üzere işaretlenenler (henüz silinmedi — önce onay ekranında görürsün).
-    @Published private(set) var pendingDelete: [AssetEntry] = []
-    @Published var isDeleting = false
-    @Published var deleteError: String?
 
-    private let service: PhotoLibraryService
-    private let store: ReviewStore
+    let service: PhotoLibraryService
+    let store: ReviewStore
 
     enum DecisionKind { case keep, delete, skip }
     private struct Decision { let entry: AssetEntry; let kind: DecisionKind }
@@ -34,9 +30,6 @@ final class SwipeDeckViewModel: ObservableObject {
     var reviewedCount: Int { index }
     var canUndo: Bool { index > 0 }
 
-    var pendingBytes: Int64 { pendingDelete.reduce(0) { $0 + $1.byteSize } }
-    var pendingCount: Int { pendingDelete.count }
-
     // MARK: - Kararlar
 
     func keepCurrent() {
@@ -48,13 +41,10 @@ final class SwipeDeckViewModel: ObservableObject {
 
     func deleteCurrent() {
         guard let current else { return }
-        // Boyut henüz hesaplanmadıysa şimdi hesapla (yığın toplamı doğru olsun).
-        var entry = current
-        if entry.byteSize == 0 {
-            entry.byteSize = service.computeSize(for: entry.asset)
-        }
-        pendingDelete.append(entry)
-        history.append(Decision(entry: entry, kind: .delete))
+        var size = current.byteSize
+        if size == 0 { size = service.computeSize(for: current.asset) }
+        store.addPending(id: current.id, bytes: size)
+        history.append(Decision(entry: current, kind: .delete))
         advance()
     }
 
@@ -71,38 +61,13 @@ final class SwipeDeckViewModel: ObservableObject {
         case .keep:
             store.unmarkKept(last.entry.id)
         case .delete:
-            pendingDelete.removeAll { $0.id == last.entry.id }
+            store.removePending(id: last.entry.id)
         case .skip:
             break
         }
     }
 
-    func removeFromPile(_ entry: AssetEntry) {
-        pendingDelete.removeAll { $0.id == entry.id }
-    }
-
     private func advance() {
         index += 1
-    }
-
-    // MARK: - Silmeyi onayla
-
-    /// İşaretlenen tüm öğeleri siler. iOS kendi onay penceresini gösterir.
-    /// Başarılı olursa istatistikler güncellenir ve yığın boşaltılır.
-    func commitDeletions() async {
-        guard !pendingDelete.isEmpty else { return }
-        isDeleting = true
-        deleteError = nil
-        let assets = pendingDelete.map { $0.asset }
-        let ids = pendingDelete.map { $0.id }
-        let bytes = pendingBytes
-        do {
-            try await service.deleteAssets(assets)
-            store.recordDeletion(ids: ids, bytes: bytes)
-            pendingDelete.removeAll()
-        } catch {
-            deleteError = "Silme tamamlanmadı ya da iptal edildi."
-        }
-        isDeleting = false
     }
 }
