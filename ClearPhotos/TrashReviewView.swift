@@ -14,9 +14,21 @@ struct TrashReviewView: View {
     @State private var isDeleting = false
     @State private var errorText: String?
 
-    private let columns = [GridItem(.adaptive(minimum: 100), spacing: 8)]
+    private let gridSpacing: CGFloat = 10
+    private let gridPadding: CGFloat = 12
+    private let minCellWidth: CGFloat = 100
 
     private var totalBytes: Int64 { entries.reduce(0) { $0 + $1.byteSize } }
+
+    private func columnCount(for width: CGFloat) -> Int {
+        max(1, Int((width - gridPadding * 2 + gridSpacing) / (minCellWidth + gridSpacing)))
+    }
+
+    private func cellSide(for width: CGFloat) -> CGFloat {
+        let count = CGFloat(columnCount(for: width))
+        let usableWidth = width - gridPadding * 2 - gridSpacing * (count - 1)
+        return usableWidth / count
+    }
 
     var body: some View {
         NavigationStack {
@@ -28,14 +40,22 @@ struct TrashReviewView: View {
                 } else {
                     VStack(spacing: 0) {
                         header
-                        ScrollView {
-                            LazyVGrid(columns: columns, spacing: 8) {
-                                ForEach(entries) { entry in
-                                    cell(entry)
+                        GeometryReader { geo in
+                            let side = cellSide(for: geo.size.width)
+                            let gridColumns = Array(
+                                repeating: GridItem(.fixed(side), spacing: gridSpacing),
+                                count: columnCount(for: geo.size.width)
+                            )
+
+                            ScrollView {
+                                LazyVGrid(columns: gridColumns, spacing: gridSpacing) {
+                                    ForEach(entries) { entry in
+                                        cell(entry, side: side)
+                                    }
                                 }
+                                .padding(gridPadding)
+                                Color.clear.frame(height: 90)
                             }
-                            .padding(12)
-                            Color.clear.frame(height: 90)
                         }
                     }
                     VStack {
@@ -79,15 +99,12 @@ struct TrashReviewView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func cell(_ entry: AssetEntry) -> some View {
+    private func cell(_ entry: AssetEntry, side: CGFloat) -> some View {
         ZStack(alignment: .topTrailing) {
-            GeometryReader { proxy in
-                ThumbnailView(asset: entry.asset)
-                    .frame(width: proxy.size.width, height: proxy.size.width)
-                    .clipped()
-            }
-            .aspectRatio(1, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            ThumbnailView(asset: entry.asset)
+                .frame(width: side, height: side)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(alignment: .bottomLeading) {
                     Text(formattedBytes(entry.byteSize))
                         .font(.caption2.bold())

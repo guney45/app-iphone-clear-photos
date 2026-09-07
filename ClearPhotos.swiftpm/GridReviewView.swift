@@ -20,10 +20,22 @@ struct GridReviewView: View {
         _entries = State(initialValue: entries)
     }
 
-    private let columns = [GridItem(.adaptive(minimum: 90), spacing: 6)]
+    private let gridSpacing: CGFloat = 10
+    private let gridPadding: CGFloat = 12
+    private let minCellWidth: CGFloat = 100
 
     private var selectedEntries: [AssetEntry] { entries.filter { selected.contains($0.id) } }
     private var selectedBytes: Int64 { selectedEntries.reduce(0) { $0 + $1.byteSize } }
+
+    private func columnCount(for width: CGFloat) -> Int {
+        max(1, Int((width - gridPadding * 2 + gridSpacing) / (minCellWidth + gridSpacing)))
+    }
+
+    private func cellSide(for width: CGFloat) -> CGFloat {
+        let count = CGFloat(columnCount(for: width))
+        let usableWidth = width - gridPadding * 2 - gridSpacing * (count - 1)
+        return usableWidth / count
+    }
 
     var body: some View {
         ZStack {
@@ -32,14 +44,22 @@ struct GridReviewView: View {
             if entries.isEmpty {
                 emptyState
             } else {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 6) {
-                        ForEach(entries) { entry in
-                            cell(entry)
+                GeometryReader { geo in
+                    let side = cellSide(for: geo.size.width)
+                    let gridColumns = Array(
+                        repeating: GridItem(.fixed(side), spacing: gridSpacing),
+                        count: columnCount(for: geo.size.width)
+                    )
+
+                    ScrollView {
+                        LazyVGrid(columns: gridColumns, spacing: gridSpacing) {
+                            ForEach(entries) { entry in
+                                cell(entry, side: side)
+                            }
                         }
+                        .padding(gridPadding)
+                        Color.clear.frame(height: 90)
                     }
-                    .padding(8)
-                    Color.clear.frame(height: 90)
                 }
 
                 if !selected.isEmpty {
@@ -77,15 +97,12 @@ struct GridReviewView: View {
 
     // MARK: - Hücre
 
-    private func cell(_ entry: AssetEntry) -> some View {
+    private func cell(_ entry: AssetEntry, side: CGFloat) -> some View {
         let isSel = selected.contains(entry.id)
-        return GeometryReader { proxy in
-            ThumbnailView(asset: entry.asset)
-                .frame(width: proxy.size.width, height: proxy.size.width)
-                .clipped()
-        }
-        .aspectRatio(1, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        return ThumbnailView(asset: entry.asset)
+            .frame(width: side, height: side)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(alignment: .bottomLeading) {
                 if entry.byteSize > 0 {
                     Text(formattedBytes(entry.byteSize))
