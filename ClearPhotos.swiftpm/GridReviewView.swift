@@ -79,10 +79,13 @@ struct GridReviewView: View {
 
     private func cell(_ entry: AssetEntry) -> some View {
         let isSel = selected.contains(entry.id)
-        return ThumbnailView(asset: entry.asset)
-            .aspectRatio(1, contentMode: .fill)
-            .frame(minWidth: 0, maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+        return GeometryReader { proxy in
+            ThumbnailView(asset: entry.asset)
+                .frame(width: proxy.size.width, height: proxy.size.width)
+                .clipped()
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(alignment: .bottomLeading) {
                 if entry.byteSize > 0 {
                     Text(formattedBytes(entry.byteSize))

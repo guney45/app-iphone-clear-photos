@@ -81,10 +81,13 @@ struct TrashReviewView: View {
 
     private func cell(_ entry: AssetEntry) -> some View {
         ZStack(alignment: .topTrailing) {
-            ThumbnailView(asset: entry.asset)
-                .aspectRatio(1, contentMode: .fill)
-                .frame(minWidth: 0, maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+            GeometryReader { proxy in
+                ThumbnailView(asset: entry.asset)
+                    .frame(width: proxy.size.width, height: proxy.size.width)
+                    .clipped()
+            }
+            .aspectRatio(1, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(alignment: .bottomLeading) {
                     Text(formattedBytes(entry.byteSize))
                         .font(.caption2.bold())
